@@ -24,7 +24,7 @@ setup(
         'pandas',
         'pytest',
         'psutil',
-        'scipy==1.10.1',
+        'scipy>=1.7.3,<=1.10.1',
         'seaborn==0.8.1',
         'tensorflow>=1.8.0,<3.0',
         'torch==1.13.1',
