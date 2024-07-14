@@ -229,6 +229,7 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent():
+        final_states = np.empty((num_test_episodes, env.state.shape[0]))
         for j in range(num_test_episodes):
             o, d, ep_ret, ep_len = test_env.reset(), False, 0, 0
             while not(d or (ep_len == max_ep_len)):
@@ -236,12 +237,15 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 o, r, d, _ = test_env.step(get_action(o, 0))
                 ep_ret += r
                 ep_len += 1
+            final_states[j] = env.state
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
+        return final_states
 
     # Prepare for interaction with environment
     total_steps = steps_per_epoch * epochs
     start_time = time.time()
     o, ep_ret, ep_len = env.reset(), 0, 0
+    final_states = np.empty((epochs, num_test_episodes, env.state.shape[0]))
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
@@ -291,7 +295,8 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
                 logger.save_state({'env': env}, None)
 
             # Test the performance of the deterministic version of the agent.
-            test_agent()
+            i = ((t +1)// steps_per_epoch) -1
+            final_states[i] = test_agent()
 
             # Log info about epoch
             logger.log_tabular('Epoch', epoch)
@@ -303,8 +308,13 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
             logger.log_tabular('QVals', with_min_and_max=True)
             logger.log_tabular('LossPi', average_only=True)
             logger.log_tabular('LossQ', average_only=True)
-            logger.log_tabular('Time', time.time()-start_time)
+            logger.log_tabular('Time', time.time() - start_time)
             logger.dump_tabular()
+
+    if "output_dir" in logger_kwargs:
+        output_dir = logger_kwargs[ "output_dir"]
+        np.savez(f"{output_dir}/final_states.npz", states=final_states)
+
 
 if __name__ == '__main__':
     import argparse
