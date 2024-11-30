@@ -6,6 +6,7 @@ import gym
 import time
 import spinup.algos.pytorch.ddpg.core as core
 from spinup.utils.logx import EpochLogger
+from spinup.algos.pytorch.ddpg.noise import OUNoise
 
 
 class ReplayBuffer:
@@ -45,7 +46,7 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
          steps_per_epoch=4000, epochs=100, replay_size=int(1e6), gamma=0.99, 
          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
          update_after=1000, update_every=50, act_noise=0.1, num_test_episodes=10, 
-         max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
+         max_ep_len=1000, logger_kwargs=dict(), save_freq=1, noise_kwargs=dict()):
     """
     Deep Deterministic Policy Gradient (DDPG)
 
@@ -158,6 +159,9 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
     var_counts = tuple(core.count_vars(module) for module in [ac.pi, ac.q])
     logger.log('\nNumber of parameters: \t pi: %d, \t q: %d\n'%var_counts)
 
+    # Create OU noise
+    noise = OUNoise(**noise_kwargs)
+
     # Set up function for computing DDPG Q-loss
     def compute_loss_q(data):
         o, a, r, o2, d = data['obs'], data['act'], data['rew'], data['obs2'], data['done']
@@ -225,8 +229,9 @@ def ddpg(env_fn, actor_critic=core.MLPActorCritic, ac_kwargs=dict(), seed=0,
 
     def get_action(o, noise_scale):
         a = ac.act(torch.as_tensor(o, dtype=torch.float32))
-        a += noise_scale * np.random.randn(act_dim)
-        return np.clip(a, -act_limit, act_limit)
+        if bool(noise_scale):
+            a = noise.get_action(a)
+        return a 
 
     def test_agent():
         final_states = np.empty((num_test_episodes, env.state.shape[0]))
