@@ -31,6 +31,7 @@ class OUNoise(object):
 
     def reset(self) -> None:
         self.state = np.ones(self.action_dim) * self.mu
+        self._t = 0
 
     def evolve_state(self) -> np.ndarray:
         '''
@@ -47,7 +48,7 @@ class OUNoise(object):
         self.state = x + dx
         return np.clip(self.state, self.low, self.high)
 
-    def get_action(self, action: np.ndarray, t: float = 0.0) -> np.ndarray:
+    def get_action(self, action: np.ndarray, t: float = None) -> np.ndarray:
         '''
         Get the action with noise
 
@@ -63,6 +64,9 @@ class OUNoise(object):
         action: np.ndarray
             Action with noise
         '''
+        if not isinstance(t, float):
+            t = self._t
+            self._t += 1 
         ou_state = self.evolve_state()
         self.sigma = self.max_sigma - \
             (self.max_sigma - self.min_sigma) * min(1.0, t / self.decay_period)
